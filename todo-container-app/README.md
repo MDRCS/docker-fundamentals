@@ -53,3 +53,29 @@
       A /todo/dist/react.min.js (react.min.js has been added)
       C /root (/root directory has been changed)
 
+
+#### - Docker layering
+
+![Architecture](./static/docker-layers.png)
+
+    + Docker layering helps you manage a big problem that arises when you use containers
+      at scale. Imagine what would happen if you started up hundreds—or even thousands—of
+      the to-do app, and each of those required a copy of the files to be stored somewhere.
+
+    + As you can imagine, disk space would run out pretty quickly! By default,
+      Docker internally uses a copy-on-write mechanism to reduce the amount of disk space required
+
+#### - Docker Copy-on-write
+
+![Architecture](./static/docker-copy-on-write-mechanism.png)
+
+     Whenever a running container needs to write to a file, it records the change by copying
+     the item to a new area of disk. When a Docker commit is performed, this new area of disk
+     is frozen and recorded as a layer with its own identifier.
+     This partly explains how Docker containers can start up so quickly—they have nothing
+     to copy because all the data has already been stored as the image.
+
+     #COPY-ON-WRITE Copy-on-write is a standard optimization strategy used in com- puting.
+     When you create a new object (of any type) from a template, rather than copying
+     the entire set of data required, you only copy data over when it’s changed.
+     Depending on the use case, this can save considerable resources.
