@@ -79,3 +79,18 @@
      When you create a new object (of any type) from a template, rather than copying
      the entire set of data required, you only copy data over when it’s changed.
      Depending on the use case, this can save considerable resources.
+
+    Because the layers are static, you only need build on top of the image you wish to take as a reference,
+    should you need anything to change in a higher layer. In the to-do app, you built from the publicly available
+    node image and layered changes on top.
+    All three layers can be shared across multiple running containers, much as a shared library can be shared
+    in memory across multiple running processes. This is a vital feature for operations, allowing the running
+    of numerous containers based on different images on host machines without running out of disk space.
+    Imagine that you’re running the to-do app as a live service for paying customers.
+    You can scale up your offering to a large number of users. If you’re developing,
+    you can spin up many different environments on your local machine at once.
+    If you’re moving through tests, you can run many more tests simultaneously, and far more quickly than before.
+    All these things are made possible by layering.
+    By building and running an application with Docker, you’ve begun to see the power that Docker can bring
+    to your workflow. Reproducing and sharing specific envi- ronments and being able to land these in various
+    places gives you both flexibility and control over development.
