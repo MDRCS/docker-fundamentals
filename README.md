@@ -170,45 +170,53 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
     2- docker pull node (download docker image with name node)
 ![docker-hub](./static/docker-hub.png)
 
-### - Technique 6:
-    We’ve explored how to use a container as a monolithic entity (like a classical server) and explained that it
-    can be a great way to quickly move a system architecture onto Docker. In the Docker world,
-    however, it’s generally considered a best practice to split up your system as much as possible until
-    you have one service running per container and have all containers connected by networks.
 
-    The primary reason for using one service per container is the easier separation of concerns
-    through the single-responsibility principle. If you have one container doing one job,
-    it’s easier to put that container through the software development lifecycle of development,
-    test, and production while worrying less about its interactions with other components.
-    This makes for more agile deliveries and more scalable software projects.
-    It does create management overhead, though, so it’s good to consider whether it’s worth it for your use case.
+### - Technique 6:
+
+    If you’ve ever developed any kind of software, you’ve likely exclaimed,
+    “I’m sure it was working before!” at least once. Perhaps your language was not as sober as this.
+    The inability to restore a system to a known good (or maybe only “better”) state when you’re hurriedly
+    hacking away at code to hit a deadline or fix a bug is the cause of many bro- ken keyboards.
+
+    Source control has helped significantly with this, but there are two problems in this particular case:
+
+    - The source may not reflect the state of your “working” environment’s filesystem.
+    - You may not be willing to commit the code yet.
+
+    The first problem is more significant than the second. Although modern source control tools
+    like Git can easily create local throwaway branches, capturing the state of your entire development
+    filesystem isn’t the purpose of source control.
+
+    Docker provides a cheap and quick way to store the state of your container’s development filesystem
+    through its commit functionality, and that’s what we’re going to explore here.
 
     + PROBLEM :
-    You want to break your application up into distinct and more manageable services.
+    You want to save the state of your development environment.
 
     + SOLUTION :
-    Create a container for each discrete service process.
-    As we’ve touched upon already, there’s some debate within the Docker community
-    about how strictly the “one service per container” rule should be followed,
-    with part of this stemming from a disagreement over the definitions—is it a single process,
-    or a collection of processes that combine to fulfill a need? It often boils down to a state- ment that,
-    given the ability to redesign a system from scratch, microservices is the route most would chose.
+    Regularly commit your container so you can recover state at that point.
+    Let’s imagine you want to make a change to your to-do application.
+    The CEO of ToDoCorp isn’t happy and wants the title of the browser to show
+    “ToDoCorp’s ToDo App” instead of “Swarm+React - TodoMVC.”
+    You’re not sure how to achieve this, so you probably want to fire up your applica-
+    tion and experiment by changing files to see what happens.
 
-    Let’s take a look at one of the concrete disadvantages of using monoliths inside Docker.
-    First, the following listing shows you how you’d build a monolith with a data- base, application, and web server.
+    1- docker run -d -p 8000:8000 --name todobug1 dockerinpractice/todoapp (in the background run the image)
+    2- docker exec -i -t todobug1 /bin/bash (get into the application folder inside docker container)
 
+    3- install some tools
+        apt-get update
+        apt-get install vim
 
-    Example:
+    4- vi local.html (make change)
+    5- docker commit todobug1
+    6- docker run -p 8001:8000 b0e9352771d1
 
-    - CMD:
+### - Technique 7:
+     + PROBLEM :
+       Downloading docker images and pushing them to my repo on docker hub
+     + Solution :
+       1- docker pull debian:wheezy
+       2- docker tag debian:wheezy mdrahali/debian:mywheezy1
+       3- docker push mdrahali/debian:mywheezy1
 
-    RUN service postgresql start && \
-    cat db/schema.sql | psql && \
-    service postgresql stop
-
-    `TIP`
-    Each Dockerfile command creates a single new layer on top of the previ- ous one,
-    but using && in your RUN statements effectively ensures that several commands get run as one command.
-    This is useful because it can keep your images small. If you run a package update command
-    like apt-get update with an install command in this way, you ensure that whenever the packages are installed,
-    they’ll be from an updated package cache.
