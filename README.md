@@ -132,3 +132,40 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
           a microservices architecture for your application. In this case you could perform work on the MySQL
           container while leaving the WordPress container untouched, or vice versa. This fine-grained control
           over running services is one of the key opera- tional benefits of a microservices architecture.
+
+### - Technique 4:
+    - Setting up a local Docker registry
+    + PROBLEM :
+      You want a way to host your images locally.
+    + SOLUTION
+      Set up a registry server on your local network. Simply issue the following command on a machine with plenty of disk space:
+      1- docker run -d -p 5000:5000 -v $HOME/registry:/var/lib/registry registry:2
+
+      - This command makes the registry available on port 5000 of the Docker host
+        (-p 5000:5000). With the -v flag, it makes the registry folder on your host
+        (/var/lib/registry) available in the container as $HOME/registry.
+        The registry’s files will therefore be stored on the host in the /var/lib/registry folder.
+
+      - On all of the machines that you want to access this registry, add the following to your daemon options
+        (where HOSTNAME is the hostname or IP address of your new reg- istry server):
+        --insecure-registry HOSTNAME (see appendix B for details on how to do this).
+        You can now issue the following command: docker push HOSTNAME:5000/ image:tag.
+
+      `TIP`
+       As you can see, the most basic level of configuration for a local registry, with all data stored
+       in the $HOME/registry directory, is simple. If you wanted to scale up or make it more robust,
+       the repository on GitHub (https://github.com/docker/distribution/ blob/v2.2.1/docs/storagedrivers.md)
+       outlines some options, like storing data in Amazon S3.
+
+### - Technique 5:
+    PROBLEM :
+    You want to find an application or tool as a Docker image and try it out.
+    SOLUTION :
+    Use the docker search command to find the image to pull, and then run it.
+
+    Let’s say you’re interested in playing with Node.js. In the following example we
+    searched for images matching “node” with the docker search command:
+
+    1- docker search node
+    2- docker pull node (download docker image with name node)
+![docker-hub](./static/docker-hub.png)
