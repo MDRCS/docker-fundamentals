@@ -169,3 +169,46 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
     1- docker search node
     2- docker pull node (download docker image with name node)
 ![docker-hub](./static/docker-hub.png)
+
+### - Technique 6:
+    We’ve explored how to use a container as a monolithic entity (like a classical server) and explained that it
+    can be a great way to quickly move a system architecture onto Docker. In the Docker world,
+    however, it’s generally considered a best practice to split up your system as much as possible until
+    you have one service running per container and have all containers connected by networks.
+
+    The primary reason for using one service per container is the easier separation of concerns
+    through the single-responsibility principle. If you have one container doing one job,
+    it’s easier to put that container through the software development lifecycle of development,
+    test, and production while worrying less about its interactions with other components.
+    This makes for more agile deliveries and more scalable software projects.
+    It does create management overhead, though, so it’s good to consider whether it’s worth it for your use case.
+
+    + PROBLEM :
+    You want to break your application up into distinct and more manageable services.
+
+    + SOLUTION :
+    Create a container for each discrete service process.
+    As we’ve touched upon already, there’s some debate within the Docker community
+    about how strictly the “one service per container” rule should be followed,
+    with part of this stemming from a disagreement over the definitions—is it a single process,
+    or a collection of processes that combine to fulfill a need? It often boils down to a state- ment that,
+    given the ability to redesign a system from scratch, microservices is the route most would chose.
+
+    Let’s take a look at one of the concrete disadvantages of using monoliths inside Docker.
+    First, the following listing shows you how you’d build a monolith with a data- base, application, and web server.
+
+
+    Example:
+
+    - CMD:
+
+    RUN service postgresql start && \
+    cat db/schema.sql | psql && \
+    service postgresql stop
+
+    `TIP`
+    Each Dockerfile command creates a single new layer on top of the previ- ous one,
+    but using && in your RUN statements effectively ensures that several commands get run as one command.
+    This is useful because it can keep your images small. If you run a package update command
+    like apt-get update with an install command in this way, you ensure that whenever the packages are installed,
+    they’ll be from an updated package cache.
