@@ -220,3 +220,25 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
        2- docker tag debian:wheezy mdrahali/debian:mywheezy1
        3- docker push mdrahali/debian:mywheezy1
 
+    + PROBLEM :
+      make an image smaller
+    + Solution :
+      1- docker run -ti --name smaller --entrypoint /bin/bash \
+         dockerinpractice/log-cleaner
+      2- apt-get autoremove
+      3- apt-get clean
+
+
+### - Other commands :
+    + docker build --no-cache .
+    + docker inspect ubuntu | head (for images)
+    + docker inspect --format '{{.NetworkSettings.IPAddress}}' 555263b8906b
+       or docker inspect 555263b8906b | grep "IPAddress" (Gor IP Address of the Container)
+
+    + docker inspect 555263b8906b (for containers)
+    + history | grep name (searching for `name` in my previous commands)
+
+
+    + sudo addgroup -a username docker (running docker commands without sudo)
+    + docker ps -a -q | xargs --no-run-if-empty
+    + docker rm -f
