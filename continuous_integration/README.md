@@ -59,9 +59,3 @@
      2- configure port on 8080 and launch
      3- telnet localhost 8080
 
-     Example - Docker images :
-
-     --> If you set up two containers this way and install the same large package on both, one after the other, you should notice that the second installation downloads its prerequi- sites much quicker than the first.
-
-     1- docker build .
-     2- cd

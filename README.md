@@ -229,6 +229,15 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
       3- apt-get clean
 
 
+### - Clean up Docker:
+
+    docker container stop $(docker container ls -aq) -> remove all containers
+    docker image prune
+    docker container prune
+    docker volume prune
+    docker network prune
+    docker rmi -f $(docker images -a -q)
+
 ### - Other commands :
     + docker build --no-cache .
     + docker inspect ubuntu | head (for images)
@@ -242,3 +251,4 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
     + sudo addgroup -a username docker (running docker commands without sudo)
     + docker ps -a -q | xargs --no-run-if-empty
     + docker rm -f
+
