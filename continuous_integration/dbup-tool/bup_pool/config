@@ -1,8 +1,0 @@
-[core]
-	repositoryformatversion = 0
-	filemode = true
-	bare = true
-	ignorecase = true
-	logAllRefUpdates = true
-[pack]
-	indexVersion = 2

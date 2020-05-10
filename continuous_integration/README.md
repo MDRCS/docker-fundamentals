@@ -333,3 +333,6 @@
 ![zero-downtime](zero-downtime-app.png)
 
     - Zero-downtime deployment can be achieved by combining etcd, confd, and nginx.
+
++ [etcd](https://etcd.io/)
++ [github-etcd](https://github.com/etcd-io/etcd)
