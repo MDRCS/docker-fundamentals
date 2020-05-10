@@ -95,3 +95,140 @@
     by wiring up containers to proxy SQLite invocations to the data on the host. Managing the container complexity
     is made significantly easier with Docker Compose’s YAML configuration, which turns the tricky matter of orchestrating
     containers correctly from a manual, error-prone process to a safer, automated one that can be put under source control.
+
+### Technique 3 - Simulating troublesome networks with Comcast :
+
+    + PROBLEM :
+    You want to be able to apply varying network conditions to individual containers.
+
+    + SOLUTION :
+    Use Comcast
+
+    $ IMG=mdrahali/comcast
+    $ docker pull $IMG
+    $ alias comcast="docker run --rm --pid=host --privileged \
+      -v /var/run/docker.sock:/var/run/docker.sock $IMG"
+    $ comcast -help
+
+    $ docker run -it --name c1 ubuntu:14.04.2 bash
+    $ root@99267a5c48e4:/# apt-get update && apt-get install -y wget
+    $ root@99267a5c48e4:/# ping -q -c 5 www.example.com
+    $ root@99267a5c48e4:/# time wget -o /dev/null https://www.example.com
+
+    + Once you’ve done this, leave the container running and
+    you can apply some network conditions to it:
+
+    $ docker build -t docker-comcast .
+    $ comcast -cont c1 -default-bw 50 -latency 100 -packet-loss 20%
+
+
+    -> The preceding command applies three different conditions:
+       50 KBps bandwidth cap for all destinations (to bring back memories of dial-up),
+       an added latency of 100 ms (on top of any inherent delay),
+       and a packet loss percentage of 20%.
+
+    -> Comcast first identifies the appropriate virtual network interface for the container and then invokes
+       a number of standard Linux command-line networking utilities to apply the traffic rules,
+       listing what it’s doing as it goes along.
+       Let’s see how our con- tainer reacts to this:
+
+        root@99267a5c48e4:/# ping -q -c 5 www.example.com
+        PING www.example.com (93.184.216.34) 56(84) bytes of data.
+
+        --- www.example.com ping statistics ---
+        5 packets transmitted, 4 received, 20% packet loss, time 4060ms
+        rtt min/avg/max/mdev = 220.955/310.946/494.679/107.620 ms
+
+        !SUCCESS
+
+     Success! An additional 100 ms of latency is reported by ping,
+     and the timing from wget shows a slightly greater than 5x slowdown,
+     approximately as expected (the bandwidth cap, latency addition,
+     and packet loss will all impact on this time). But there’s some- thing
+     odd about the packet loss—it seems to be three times greater than expected.
+     It’s important to bear in mind that the ping is sending a few packets,
+     and that packet loss isn’t a precise “one in five”
+     counter—if you increase the ping count to 50,
+     you’ll find that the resulting loss is much closer to what’s expected.
+
+
+     ++ You need to remove the rules if you want to get your normal container network operation back.
+
+     - Don’t worry about removing them if you exit the container, though—they’ll be auto-
+       matically deleted when Docker deletes the virtual network interface.
+
+     $ comcast -cont c1 -stop
+
+### Technique 4 - Simulating troublesome networks with Blockade
+
+    On the subject of simulating a network with many machines, there’s a particular kind of network failure that becomes
+    interesting at this scale—a network partition. This is when a group of networked machines splits into two or more parts,
+    such that all machines in the same part can talk to each other, but different parts can’t commu- nicate.
+    Research indicates that this happens more than you might think, particularly on consumer-grade clouds!
+    Going down the classic Docker microservices route brings these problems into sharp relief,
+    and having the tools to do experiments is crucial for understanding how your service will deal with it.
+
+    PROBLEM
+    You want to orchestrate setting network conditions for large numbers of containers,
+    including creating network partitions.
+
+    SOLUTION
+    Use Blockade (https://github.com/worstcase/blockade)—an open source piece of software originally from a team at Dell,
+    created for “testing network failures and partitions.
+
+    + Blockade works by reading a configuration file (blockade.yml) in your current directory
+      that defines how to start containers and what conditions to apply to them. In order to apply conditions,
+      it may download other images with required utilities installed. The full configuration details
+      are available in the Blockade documentation
+
+    + Blockade is a utility for testing network failures and partitions in distributed applications.
+      Blockade uses Docker containers to run application processes and manages
+      the network from the host system to create various failure scenarios.
+
+    + blockade.yml :
+     The sleep 5 commands are to make sure the server is running before starting the clients.
+
+    $ cd network-failure
+    $ IMG=mdrahali/blockade
+    $ docker pull $IMG
+
+    $ alias blockade="docker run --rm -v \$PWD:/blockade \
+      -v /var/run/docker.sock:/var/run/docker.sock $IMG"
+
+    $ blockade up
+
+    $ docker logs -f e8188fc6a99d # see waht happen in given container
+
+![](./network-failure/make-client-slow.png)
+![](./network-failure/make-containers-fast-again.png)
+![](./network-failure/analysis.png)
+
+    + so let’s take a look at the killer feature of Blockade — network partitions:
+
+    $ blockade partition server client1,client2
+    $ blockade status
+
+    -> This has put our three nodes in two boxes
+       1- the server in one
+       2- and clients in the other
+
+       #with no way of communicating between them.
+
+       You’ll see that the log for client1 has stopped doing anything
+       because all of the ping packets are being lost.
+
+    $ docker logs -f e8188fc6a99d
+
+    - The clients can still talk to each other, though, and you can verify this
+      by sending a few ping packets between them:
+
+    $ docker exec e8188fc6a99d ping -qc 3 172.19.0.4
+
+    + pinging IP address of container to know if it's on the same network with you or not.
+
+    for example after partitions there is no bridge between client1 and server
+    result: 3 packets transmitted, 0 received, 100% packet loss, time 2048ms
+
+![](./network-failure/internal-docker-networking.png)
+
+### Technique 4 - Creating another Docker virtual network

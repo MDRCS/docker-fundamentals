@@ -1,0 +1,15 @@
+containers:
+  server:
+    container_name: server
+    image: ubuntu:14.04.2
+    command: /bin/sleep infinity
+  client1:
+    image: ubuntu:14.04.2
+    command: sh -c "sleep 5 && ping server"
+  client2:
+    image: ubuntu:14.04.2
+    command: sh -c "sleep 5 && ping server"
+network:
+  flaky: 50%
+  slow: 100ms
+  driver: udn

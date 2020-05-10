@@ -1,0 +1,4 @@
+{"status": "Success", "timestamp": 1589147484.698431, "message": "", "event": "flaky", "targets": ["client1", "client2", "server"]}
+{"status": "Success", "timestamp": 1589147496.769596, "message": "", "event": "slow", "targets": ["client1"]}
+{"status": "Success", "timestamp": 1589147529.038204, "message": "", "event": "fast", "targets": ["client1", "client2", "server"]}
+{"status": "Success", "timestamp": 1589153041.985567, "message": "", "event": "partition", "targets": [["server"], ["client1", "client2"]]}
