@@ -202,7 +202,7 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
     tion and experiment by changing files to see what happens.
 
     1- docker run -d -p 8000:8000 --name todobug1 dockerinpractice/todoapp (in the background run the image)
-    2- docker exec -i -t todobug1 /bin/bash (get into the application folder inside docker container)
+    2docker exec -i -t todobug1 /bin/bash - (get into the application folder inside docker container)
 
     3- install some tools
         apt-get update
@@ -246,7 +246,6 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
 
     + docker inspect 555263b8906b (for containers)
     + history | grep name (searching for `name` in my previous commands)
-
 
     + sudo addgroup -a username docker (running docker commands without sudo)
     + docker ps -a -q | xargs --no-run-if-empty
