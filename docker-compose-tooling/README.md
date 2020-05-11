@@ -232,3 +232,38 @@
 ![](./network-failure/internal-docker-networking.png)
 
 ### Technique 4 - Creating another Docker virtual network
+
+    $ docker network ls
+    $ docker network create --driver=bridge mynet
+    $ docker network ls | grep mynet
+    $ ifconfig | grep br-
+    $ ifconfig | grep docker
+
+    #Start two container on `mynet` network
+    $ docker rm --force c1
+    $ docker run -it -d --name c1 ubuntu:14.04.2 bash
+    $ docker network connect mynet c1 # {default, mynet}
+    $ docker run -it -d --name c2 \
+      --net=mynet ubuntu:14.04.2 bash # {mynet} is created inside mynet
+    $ docker run -it -d --name c3 ubuntu:14.04.2 bash {default} have just by default bridge
+
+    $ docker exec c1 ip addr | grep 'inet.*eth'
+          inet 172.17.0.3/16 brd 172.17.255.255 scope global eth0 # default bridge
+          inet 172.20.0.3/16 brd 172.20.255.255 scope global eth1 # mynet bridge
+
+    $ docker exec c2 ip addr | grep 'inet.*eth'
+          inet 172.20.0.2/16 brd 172.20.255.255 scope global eth0
+
+    $ docker exec c3 ip addr | grep 'inet.*eth'
+         inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
+
+    $ docker exec c2 ping -qc1 c1 # bing c1 from c2 (both linked to mynet bridge)
+    $ docker exec c2 ping -qc1 c3
+    $ docker exec c1 ping -qc1 c2
+    $ docker exec c1 ping -qc1 c3
+    $ docker exec c1 ping -qc1 172.17.0.3
+
+    On the new bridge, containers can ping each other with IP address and name.
+    + On the default bridge, containers can only ping each other by IP address.
+
+### Technique 5 - Setting up a substrate network with Weave
