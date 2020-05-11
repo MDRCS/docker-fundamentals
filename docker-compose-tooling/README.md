@@ -267,3 +267,69 @@
     + On the default bridge, containers can only ping each other by IP address.
 
 ### Technique 5 - Setting up a substrate network with Weave
+    PROBLEM
+    You want to seamlessly communicate between containers across hosts.
+    SOLUTION
+    Use Weave Net (referred to as just “Weave” for the rest of this technique) to set up a network
+    that lets containers talk to each other as if they’re on a local network together.
+    We’re going to demonstrate the principle of a substrate network with Weave
+    (https://www.weave.works/oss/net/), a tool designed for this purpose.
+    Figure belowshows an overview of a typical Weave network.
+
+![](./communicate_across_hosts/weave.png)
+
+    In figure above, host 1 has no access to host 3, but they can talk to each other
+    over the Weave network as though they were locally connected. The Weave network
+    isn’t open to the public—only to those containers started up under Weave.
+    This makes the devel- opment, testing, and deployment of code across different
+    environments relatively straightforward, because the network topology
+    can be made the same in each case.
+
+    + Weave needs to be installed on every host that you want to be part of your Weave network:
+
+    Example :
+    Host 2 - MacOS - 41.251.200.202
+    Host 1 - Linux Ubuntu 10.211.55.7
+
+    $ sudo curl -L git.io/weave -o /usr/local/bin/weave
+    $ sudo chmod a+x /usr/local/bin/weave
+
+    TIP
+    If you experience problems with this technique, it’s likely that the network is firewalled in some way.
+    If you’re not sure, talk to your network administrator. Specifically,
+    you’ll need to have port 6783 open for both TCP and UDP, and 6784 for UDP.
+
+
+    # Get ip addresses of both hosts:
+    $ curl ifconfig.io/ip
+    $ hostname -I | awk '{print $1}'
+    $ ping 10.211.55.7
+    $ ping 41.251.200.202 (check if there is no problem)
+
+    #Setup weave
+    Do the same for host 1 -> a2
+    Host 1
+
+        host 1 $ weave launch
+        host 2 $ sudo weave launch 10.32.0.1
+        $ eval $(weave env)
+        $ docker run -it --name a2 ubuntu:14.04 bash
+
+        Problem :
+        - docker: Cannot connect to the Docker daemon at unix:///var/run/weave/weave.sock.
+        Solution
+        - use sudo docker run -it --name a1 ubuntu:14.04 bash (for every command)
+
+        mac $ ip addr show eth0
+        linux $ ip addr show ethew # retreive ip address of the container on weave
+
+        Host 1 - container - Ip addr - 10.32.0.1
+
+
+    + Weave takes care of inserting an additional interface into the container, ethwe, which provides an IP address on the Weave network.
+
+    # Test you connection
+    $ ping -qc1 10.32.0.1
+
+
+- [weave-doc](https://www.weave.works/docs/net/latest/overview/)
