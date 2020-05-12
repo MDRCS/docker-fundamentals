@@ -325,7 +325,6 @@
 
         Host 1 - container - Ip addr - 10.32.0.1
 
-
     + Weave takes care of inserting an additional interface into the container, ethwe, which provides an IP address on the Weave network.
 
     # Test you connection
