@@ -232,7 +232,9 @@
     $ docker start etcd2
     $ curl -L $HTTPIP:8080/v2/keys/mykey3 -XPUT -d value="t"
 
-    #Etcd permits reading but prevents writing when half or more of the nodes are not available.
+    ++ Etcd permits reading but prevents writing when half or more of the nodes are not available.
+    ++ ETCD  if you lose under half of your server agents, you’re guaranteed to be able to recover your data.
+      Because these servers are so important and have greater resource requirements, keeping them on dedicated machines is a typical choice.
 
     #Using an etcd proxy inside an ambassador container
     $ docker run -it --rm --link etcd-proxy:etcd ubuntu:14.04.2 bash

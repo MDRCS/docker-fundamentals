@@ -254,3 +254,126 @@
     ++ this simplicity comes at a cost once you move to more advanced deployment
        scenarios—features like resource limits, dynamic scaling,
        and so on are currently miss- ing, so you may find yourself reinventing parts of tools like Kubernetes
+
+### - Technique 4 - Using Consul to discover services
+
+    + etcd is a highly popular tool, but it does have one particular competitor
+      that gets men- tioned alongside it a lot: Consul. This is a little strange,
+      because there are other tools more similar to etcd
+      (Zookeeper has a similar feature set to etcd but is implemented in a different language),
+      whereas Consul differentiates itself with some interesting additional features,
+      like service discovery and health checks. In fact,
+      if you squint, Consul might look a bit like etcd, SkyDNS, and Nagios all in one.
+
+    + PROBLEM :
+    You need to be able to distribute information to, discover services within, and monitor
+    a collection of containers.
+
+    + SOLUTION :
+    Start a container with Consul on each Docker host to provide a service directory and configuration communication system.
+
+    + Consul provides the following:
+    - Service configuration—A key/value store for storing and sharing small values, like etcd and Zookeeper
+    - Service discovery—An API for registering services and a DNS endpoint for discov- ering them, like SkyDNS
+    - Service monitoring—An API for registering health checks, like Nagios
+
+    ++  In short, if you lose under half of your server agents,
+        you’re guaranteed to be able to recover your data
+        Because these servers are so important and have greater resource requirements,
+        keeping them on dedicated machines is a typical choice.
+
+    NOTE
+    Although the commands in this technique will leave the Consul data directory
+    (/data) inside the container, it’s generally a good idea to specify
+    this directory as a volume for at least the servers, so you can keep backups.
+
+![consul-setup](./multi-host-docker/consul-setup.png)
+
+    - It’s recommended that all machines under your control that may want to interact
+      with Consul should run a client agent.
+      These agents forward requests on to the servers and run health checks.
+
+    $ IMG=gliderlabs/consul-server:0.6
+    $ docker pull $IMG
+    $ ip addr | grep 'inet ' | grep -v 'lo$\|docker0$\|vbox.*$'
+       or ifconfig | grep inet
+
+    - inet 192.168.1.5
+
+    $ export EXTIP1=10.0.2.15
+    $ echo '{"ports": {"dns": 53}}' > dns.json
+
+    $ docker run -d --name consul --net host \
+      -v $(pwd)/dns.json:/config/dns.json $IMG -bind $EXTIP1 -client $EXTIP1 \
+      -recursor 8.8.8.8 -recursor 8.8.4.4 -bootstrap-expect 1
+
+    $ docker logs consul
+
+    NOTE
+    The IP address 0.0.0.0 is typically used to indicate that an application should
+    listen on all available interfaces on the machine. We’ve deliberately not done this,
+    because some Linux distributions have a DNS-caching daemon listening on 127.0.0.1,
+    which disallows listening on 0.0.0.0:53.
+
+    There are three items of note in the preceding docker run command:
+    1- We’ve used --net host. Although this can be seen as a faux pas in the Docker world,
+       the alternative is to expose up to eight ports on the command line—it’s
+       a matter of personal preference, but we feel it’s justified here.
+       It also helps bypass a potential issue with UDP communication.
+       If you were to go the manual route, there’d be no need to set
+       the DNS port—you could expose the default Consul DNS port (8600)
+       as port 53 on the host.
+    2- The two recursor arguments tell Consul what DNS servers to look at if a requested address
+       is unknown by Consul itself.
+
+    3- The -bootstrap-expect 1 argument means the Consul cluster will start operating with only one agent,
+       which is not robust. A typical setup would set this to 3 (or more) to make sure the cluster
+       doesn’t start until the required number of servers has joined. To start the additional server agents,
+       add a -join argument, as we’ll discuss when we start a client.
+
+    WARNING
+    Because Consul expects to be able to listen on a particular set of ports when communicating with other agents,
+    it’s tricky to set up multiple agents on a single machine while still demonstrating how it would work in the real world.
+    We’ll use a different host now—if you decide to use an IP alias, ensure you pass a -node newAgent,
+    because by default the hostname will be used, which will conflict.
+
+    + Now let’s go to a second machine, start a client agent, and add it to our cluster:
+
+    #Setup Consul Agent in a diffrent host :
+
+    $ IMG=gliderlabs/consul-agent:0.6
+    $ docker pull $IMG
+    $ EXTIP1=10.0.2.15
+    $ ip addr | grep docker0 | grep inet
+    $ BRIDGEIP=172.17.0.1
+    $ ip addr | grep 'inet ' | grep -v 'lo$\|docker0$'
+    $ EXTIP2=10.0.2.15
+    $ echo '{"ports": {"dns": 53}}' > dns.json
+    $ docker run -d --name consul-client --net host \
+      -v $(pwd)/dns.json:/config/dns.json $IMG -client $BRIDGEIP -bind $EXTIP2 \
+      -join $EXTIP1 -recursor 8.8.8.8 -recursor 8.8.4.4
+
+    $ docker logs consul-client
+
+    NOTE
+    The images we’ve used are based on gliderlabs/consul-server:0.5 and gliderlabs/consul-agent:0.5,
+    and they come with a newer version of Consul to avoid possible problems with UDP communication,
+    indicated by the constant logging of lines like “Refuting a suspect message.”
+    When version 0.6 of the images is released, you can switch back to the images from gliderlabs.
+
+    https://hub.docker.com/u/gliderlabs
+
+    $ curl -sSL $BRIDGEIP:8500/v1/agent/members | tr ',' '\n' | grep Name
+        [{"Name":"mylaptop2"
+        {"Name":"mylaptop"
+
+    $ docker run -d --name files -p 8000:80 ubuntu:14.04.2 \
+        python3 -m http.server 80
+    $ docker inspect -f '{{.NetworkSettings.IPAddress}}' files
+    $ /bin/echo -e 'GET / HTTP/1.0\r\n\r\n' | nc -i1 172.17.0.16 80 \
+      | head -n 1
+    $ curl -X PUT --data-binary '{"Name": "files", "Port": 8000}' \
+      $BRIDGEIP:8500/v1/agent/service/register
+
+    $ docker logs consul-client | tail -n 1
+    [......]
