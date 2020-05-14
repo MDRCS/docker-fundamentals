@@ -346,10 +346,11 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
     Then SCP the files from the server to the client. Make sure you replace “client” in the following commands with the hostname of your client machine. Also make sure that all the files are readable by the user that will run the docker command on the client.
     user@server:~$ sudo su
     root@server:~$ scp /etc/docker/ca.pem client:/etc/docker
-    root@server:~$ scp /etc/docker/cert.pem client:/etc/docker
+    roost@server:~$ scp /etc/docker/cert.pem client:/etc/docker
     root@server:~$ scp /etc/docker/key.pem client:/etc/docker
 
     Then connect with the credentials, which should return useful output:
     + root@client~: docker --tlsverify --tlscacert=/etc/docker/ca.pem \
     --tlscert=/etc/docker/cert.pem --tlskey=/etc/docker/key.pem \
     -H myserver.localdomain:2376 info
+
