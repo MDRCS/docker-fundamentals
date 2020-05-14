@@ -312,3 +312,44 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
     that localhost or 127.0.0.1 won’t work for specifying the other end of the authenticated
     connection—if you want to try it out on one host, you must use ip addr
     to identify an external IP address for your machine.
+
+### - Technique 9 - Securing your Docker API
+
+    In this technique we’ll show how you can open up your Docker server to others over a TCP port
+    while at the same time ensuring that only trusted clients can connect. This is achieved
+    by creating a secret key that only trusted hosts will be given. As long as that trusted
+    key remains a secret between the server and client machines, the Docker server should remain secure.
+
+    PROBLEM
+    You want your Docker API to be served securely over a port.
+    SOLUTION
+    Create a self-signed certificate, and run the Docker daemon with the --tls-verify flag.
+    This method of security depends on so-called key files being created on the server.
+    These files are created using special tools that ensure they’re difficult to copy
+    if you don’t have the server key.
+
+    + Figure below gives an overview of this how this works :
+
+![](./dockerd_remote_access/key_setup.png)
+
+    SETTING UP THE DOCKER SERVER CERTIFICATE
+    First you create the certificates and keys.
+    Generating keys requires the OpenSSL package
+
+![](./dockerd_remote_access/keys_setup_commands1.png)
+![](./dockerd_remote_access/keys_setup_commands2.png)
+
+    $ On the client host, create the Docker configuration folder in /etc as you did earlier:
+    $ user@client:~$ sudo su
+    $ root@client:~$ mkdir -p /etc/docker
+
+    Then SCP the files from the server to the client. Make sure you replace “client” in the following commands with the hostname of your client machine. Also make sure that all the files are readable by the user that will run the docker command on the client.
+    user@server:~$ sudo su
+    root@server:~$ scp /etc/docker/ca.pem client:/etc/docker
+    root@server:~$ scp /etc/docker/cert.pem client:/etc/docker
+    root@server:~$ scp /etc/docker/key.pem client:/etc/docker
+
+    Then connect with the credentials, which should return useful output:
+    + root@client~: docker --tlsverify --tlscacert=/etc/docker/ca.pem \
+    --tlscert=/etc/docker/cert.pem --tlskey=/etc/docker/key.pem \
+    -H myserver.localdomain:2376 info
