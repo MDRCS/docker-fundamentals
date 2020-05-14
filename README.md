@@ -255,4 +255,60 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
 
     Docker access and what it means
     You may be wondering what sort of damage a user can do if they can run Docker. As a simple example, the following command (don’t run it!) would delete all the binaries in /sbin on your host machine (if you took out the bogus --donotrunme flag):
-    docker run --donotrunme -v /sbin:/sbin busybox rm -rf /sbin
+    $ docker run --donotrunme -v /sbin:/sbin busybox rm -rf /sbin
+
+    SOLUTION
+    Drop the capabilities available to the container by using the --drop-cap flag.
+
+![](./static/linux_cap1.png)
+![](./static/linux_cap2.png)
+![](./static/linux_cap3.png)
+
+    + One extreme approach is to remove all the capabilities that are switched
+      on in Docker by default from the container, and see what stops working.
+      Here we start up a bash shell with the capabilities that are enabled
+      by default removed:
+
+        $ docker run -ti --cap-drop=CHOWN --cap-drop=DAC_OVERRIDE \
+        --cap-drop=FSETID --cap-drop=FOWNER --cap-drop=KILL --cap-drop=MKNOD \
+        --cap-drop=NET_RAW --cap-drop=SETGID --cap-drop=SETUID \
+        --cap-drop=SETFCAP --cap-drop=SETPCAP --cap-drop=NET_BIND_SERVICE \
+        --cap-drop=SYS_CHROOT --cap-drop=AUDIT_WRITE debian /bin/bash
+
+    TIP
+    If you want to enable or disable all capabilities, you can use all instead
+    of a specific capability, such as docker run -ti --cap-drop=all ubuntu bash.
+
+### - Technique 8 - HTTP auth on your Docker instance :
+
+    + This technique combines those two: you’ll be able to access
+      your daemon remotely and view the responses.
+
+    PROBLEM
+    You’d like basic authentication with network access available on your Docker daemon.
+
+    SOLUTION
+    Use HTTP authentication to share your Docker daemon with others temporarily.
+
+    NOTE
+    This discussion assumes your Docker daemon is using Docker’s default
+    Unix socket method of access in /var/run/docker.sock.
+
+    $ docker run -d -p 2375:2375 -v /var/run:/var/run mdrahali/docker-authenticate
+    $ curl http://username:password@localhost:2375/info
+
+
+    # Access remotly machine-to-machine
+
+    $ docker run -d --name docker-authenticate-client \
+          -p 127.0.0.1:12375:12375 \
+          dockerinpractice/docker-authenticate-client \
+          192.168.1.5:2375 username:password
+
+
+    $ docker -H localhost:12375 ps
+
+    Note
+    that localhost or 127.0.0.1 won’t work for specifying the other end of the authenticated
+    connection—if you want to try it out on one host, you must use ip addr
+    to identify an external IP address for your machine.
