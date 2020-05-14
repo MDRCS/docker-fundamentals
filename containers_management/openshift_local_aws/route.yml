@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Route
+metadata:
+  name: sqs
+spec:
+  host: sqs.192.168.64.6.com
+  port:
+    targetPort: 4576-tcp
+  to:
+    kind: Service
+    name: localstack

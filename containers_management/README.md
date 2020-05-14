@@ -377,3 +377,236 @@
 
     $ docker logs consul-client | tail -n 1
     [......]
+
+### - Technique 5 - Docker cluster with Swarm mode:
+
+    Swarm mode for Docker is the official solution from Docker Inc. to treat a cluster of hosts as a single Docker daemon
+    and deploy services to them.
+    A Docker swarm consists of a number of nodes. Each node may be a manager or a worker, and these roles are flexible
+    and can be changed in the swarm at any time. A manager coordinates the deployment of services to available nodes,
+    whereas workers will only run containers. By default, managers are available to run containers as well,
+    but you’ll see how to alter that as well.
+    When the manager is started, it initializes some state for the swarm and then listens for incoming connections
+    from additional nodes to add to the swarm.
+
+    # Host 1:
+
+    $ ip addr show | grep 'inet ' | grep -v 'lo$\|docker0$'
+       or  ifconfig | grep inet
+
+    $ docker swarm init --advertise-addr 172.18.0.1
+
+    + This has created a new swarm and set up the Docker daemon of the host h1 to be a manager.
+
+    $ docker info # check swarm created
+    $ docker node ls
+
+    # Host 2
+
+    - To add a worker to this swarm, run the following command:
+
+    $ docker swarm join \
+    --token SWMTKN-1-3t0hv6mpkzue06twnse9k7nhdq8iu8zx36l7rlw9fvhfqt2jkj-76nlkt0zv1x0krex7vrzbuj8z \
+    10.0.2.15:2377
+
+    # Host 1
+
+    $ docker node ls # check manager and worker
+
+    + we’ll mark the manager as having availability drain—by default, all managers are available to run containers,
+      but in this technique we want to demonstrate remote machine scheduling capabilities,
+      so we’ll constrain things to avoid the manager. Drain will cause any containers already
+      on the node to be redeployed elsewhere, and no new services will be scheduled on the node.
+
+    # Host 1
+
+    $ docker node update --availability drain i5vtd3romfl9jg9g4bxtg0kis
+    $ docker service create --name server -d -p 8000:8000 ubuntu:14.04 \
+        python3 -m http.server 8000
+    $ docker service ls
+
+    - There are a few things to note here. The most important is that the swarm has
+      auto- matically selected a machine to start the container on—if you had multiple workers,
+      the manager would choose one based on load balancing. You probably also recognize some of the arguments to docker
+      service create as familiar from docker run—a number of arguments are shared,
+
+    $ docker service ps server
+    $ docker node inspect --pretty h2 | grep Addr
+
+    # Host 2
+
+    $ curl -sSL 192.168.11.50:8000 | head -n4
+
+    ++ Swarm mode has a piece of additional functionality it enables by default, called the routing mesh.
+       This allows each node in the swarm to appear as if it can serve requests for all services within
+       the swarm that have published ports—any incoming connec- tions are forwarded to an appropriate node.
+
+
+
+    For example, if you go back on the h1 manager node again (which we know isn’t running the service, because it has availability drain), it will still respond on port 8000 to any requests:
+
+    host 1
+    $ curl -sSL localhost:8000 | head -n4
+
+    # Shutdown services
+
+    $ docker service rm server
+    $ docker swarm leave
+
+### - Technique 5 - Using OpenShift to run AWS APIs locally :
+
+    One of the big challenges with local development is testing an application against other services.
+    Docker can help with this if the service can be put in a container, but this leaves the large world
+    of external third-party services unsolved.
+    A common solution is to have test API instances, but these often provide fake responses—a more
+    complete test of functionality isn’t possible if an application is built around a service.
+    For example, imagine you want to use AWS S3 as an upload location for your application,
+    where it then processes the uploads—testing this will cost money.
+
+    - PROBLEM
+    You want to have AWS-like APIs available locally to develop against.
+
+    - SOLUTION
+    Set up LocalStack and use the available AWS service equivalents.
+    In this walkthrough you’re going to set up an OpenShift system using Minishift,
+    and then run LocalStack in a pod on it. OpenShift is a RedHat-sponsored wrapper around Kubernetes
+    that provides extra functionality more suited to enterprise pro- duction deployments of Kubernetes.
+
+    In this technique we’ll cover :
+
+    1- The creation of routes in OpenShift
+    2- Security context constraints
+    3- Differences between OpenShift and Kubernetes  Testing AWS services using public Docker images
+
+    ++ LOCALSTACK
+    LocalStack is a project that aims to give you as complete as possible a set of AWS APIs to develop against without incurring any cost. This is great for testing or trying code out before running it for real against AWS and potentially wasting time and money.
+    LocalStack spins up the following core Cloud APIs on your local machine:
+    1- API Gateway at http://localhost:4567
+    2- Kinesis at http://localhost:4568
+    3- DynamoDB at http://localhost:4569
+    4- DynamoDB Streams at http://localhost:4570
+    5- Elasticsearch at http://localhost:4571
+    6- S3 at http://localhost:4572
+    7- Firehose at http://localhost:4573
+    8- Lambda at http://localhost:4574
+    9- SNS at http://localhost:4575
+    10- SQS at http://localhost:4576
+    11- Redshift at http://localhost:4577
+    12- ES (Elasticsearch Service) at http://localhost:4578
+    13- SES at http://localhost:4579
+    14- Route53 at http://localhost:4580
+    15- CloudFormation at http://localhost:4581
+    16- CloudWatch at http://localhost:4582
+
+    - LocalStack supports running in a Docker container, or natively on a machine.
+      It’s built on Moto, which is a mocking framework in turn built on Boto,
+      which is a Python AWS SDK.
+
+    # Clean Install OpenShift
+    All you need to install are
+
+
+
+    # install hyperkit
+    $ brew reinstall hyperkit
+    # install docker driver for hyperkit
+    $ brew install docker-machine-driver-hyperkit
+    # install minishift
+    $ brew cask install minishift
+    # force update minishift
+    $ brew cask install --force minishift
+
+    1. Docker Desktop
+    2. Minishift (download from okd.io)
+    3. OC cli tool (download from okd.io)
+
+    $ mkdir openshift
+    $ put oc and kublect
+    $ alias oc='/Users/MDRAHALI/OpenShift/oc'
+    $ alias kubectl='/Users/mdrahali/OpenShift/kubectl'
+    and follow up these steps in terminal
+
+    # start minishift
+    $ sudo chown root:wheel /usr/local/bin/docker-machine-driver-hyperkit && sudo chmod u+s /usr/local/bin/docker-machine-driver-hyperkit
+
+    Solved here using:
+    $ minishift delete --force
+    $ rm -rf ~/.minishift
+    $ minishift start --vm-driver hyperkit
+
+    check https://192.168.64.4:8443/console
+    You are logged in as:
+        User:     developer
+        Password: <any value>
+
+    To login as administrator:
+        oc login -u system:admin
+
+
+    - Problem :
+
+    + Could not set oc CLI context for 'minishift' profile:
+      Error during setting 'minishift' as active profile:
+      The specified path to the kube config '/Users/mdrahali/.minishift/machines/minishift_kubeconfig'
+      does not exist
+
+    # check that minishift is installed
+    $ eval $(minishift oc-env)
+    $ oc get all
+    $ oc login -u system:admin
+    $ oc edit scc restricted
+
+        You’ll see the definition of the restricted SCC.
+            At this point you’re going to have to do two things:
+            - Allow containers to run as any user (in this case root)
+            - Prevent the SCC from restricting your capabilities to setuid and setgid
+
+        ALLOWING RUNASANY
+        The LocalStack container runs as root by default, but for security reasons, OpenShift doesn’t allow containers to run as root by default. Instead it picks a UID within a very high range, and runs as that UID. Note that UIDs are numbers, as opposed to user- names, which are strings mapped to a UID.
+        To simplify matters, and to allow the LocalStack container to run as root, change these lines,
+        runAsUser:
+            type: MustRunAsRange
+        to read as follows:
+        runAsUser:
+            type: RunAsAny
+
+    + This allows containers to run as any user, and not within a range of UIDs.
+
+    ALLOWING SETUID AND SETGID CAPABILITIES
+    When LocalStack starts up, it needs to become another user to start ElastiCache. The ElastiCache service doesn’t start up as the root user.
+    To get around this, LocalStack su’s the startup command to the LocalStack user in the container. Because the restricted SCC explicitly disallows actions that change your user or group ID, you need to remove these restrictions. Do this by deleting these lines:
+    - SETUID
+    - SETGID
+
+    # Make a note of the host
+    $ minishift console --machine-readable | grep HOST | sed 's/^HOST=\(.*\)/\1/'
+
+    DEPLOYING THE POD
+    Deploying the LocalStack is as easy as running this command:
+    $ oc new-app localstack/localstack --name="localstack"
+
+    NOTE
+    If you want to take a deeper look at the localstack image, it’s available at
+    https://github.com/localstack/localstack.
+    This takes the localstack/localstack image and creates an OpenShift application around
+    it for you, setting up internal services (based on the exposed ports in the LocalStack
+    Docker image’s Dockerfile), running the container in a pod, and perform- ing various other management tasks.
+
+    CREATING THE ROUTES
+    If you want to access the services from outside, you need to create OpenShift routes,
+    which create an external address for accessing services within the OpenShift network.
+    For example, to create a route for the SQS service,
+    create a file like the following, called route.yaml:
+
+    # Create the route by running this command,
+
+    $ oc create -f route.yaml
+        # to delete a route
+        $  oc delete route/<name>
+
+    #describe a route
+    $ oc describe route/sqs
+    $ oc get all
+    $ aws --endpoint-url=http://sqs.192.168.64.2.io sqs
+
+
