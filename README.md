@@ -251,3 +251,8 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
     + docker ps -a -q | xargs --no-run-if-empty
     + docker rm -f
 
+### - Docker Security :
+
+    Docker access and what it means
+    You may be wondering what sort of damage a user can do if they can run Docker. As a simple example, the following command (don’t run it!) would delete all the binaries in /sbin on your host machine (if you took out the bogus --donotrunme flag):
+    docker run --donotrunme -v /sbin:/sbin busybox rm -rf /sbin

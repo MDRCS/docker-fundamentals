@@ -609,4 +609,19 @@
     $ oc get all
     $ aws --endpoint-url=http://sqs.192.168.64.2.io sqs
 
+### - localstack example:
+    $ docker-compose up
+    $ aws --endpoint-url=http://localhost:4572 s3 mb s3://demo-bucket
 
+    + Attach an ACL to the bucket so it is readable:
+    $ aws --endpoint-url=http://localhost:4572 s3api put-bucket-acl --bucket demo-bucket --acl public-read
+
+    If you used volumes in your docker settings,
+    let's pause for a moment to look at what's going on in
+    $  cat ./.localstack/data/recorded_api_calls.json
+    # install some depandencies
+    $ npm install aws-sdk
+    $ npm install dotenv
+
+    #run
+    $ node upload_image.js
