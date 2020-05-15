@@ -354,3 +354,228 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
     --tlscert=/etc/docker/cert.pem --tlskey=/etc/docker/key.pem \
     -H myserver.localdomain:2376 info
 
+### - Technique 10 - Monitoring and logging
+
+    it’s reasonable for applications you write yourself to log to syslog.
+    Unfortunately, this will stop working once you containerize your application
+    (because there’s no syslog daemon in containers, by default). If you do decide
+    to start a syslog daemon in all of your containers, you’ll need to go to each
+    individual container to retrieve the logs.
+
+    PROBLEM
+    You want to capture syslogs centrally on your Docker host.
+
+    SOLUTION
+    Run a service container that acts as the syslog daemon for Docker containers.
+    The basic idea of this technique is to run a service container that runs a syslog daemon,
+    and share the logging touchpoint (/dev/log) via the host’s filesystem.
+    The log itself can be retrieved by querying the syslog Docker container,
+    and it’s stored in a volume.
+
+    Figure 15.1 illustrates how /tmp/syslogdev on the host’s filesystem can be used as a
+    touchpoint for all syslogging taking place on containers on the host.
+    The logging con- tainers mount and write their syslog to that location,
+    and the syslogger container col- lates all those inputs.
+
+    TIP
+    The syslog daemon is a process that runs on a server, collecting and man- aging messages
+    sent to a central file, which is normally a Unix domain socket. It generally uses /dev/log
+    as a file to receive log messages, and it logs out to /var/log/syslog.
+
+![](./monitoring_logging/syslogger/centralise_logging.png)
+
+![](./monitoring_logging/syslogger/syslogger_container.png)
+
+    # Build and Run
+    $ docker build -t syslogger .
+    $ docker run --name syslogger -d -v /tmp/syslogdev:/dev syslogger
+
+    For this demonstration, we’re going to start up 100 daemon containers that log
+    their own starting order from 0 to 100 to the syslog, using the logger command.
+    Then you’ll be able to see those messages by running a docker exec on the host
+    to look at the syslogger container’s syslog file.
+
+    for d in {1..100}
+    do
+        docker run -d -v /tmp/syslogdev/log:/dev/log ubuntu logger hello_$d
+    done
+
+    #see logs of 100 containerss
+
+    $ docker exec -ti syslogger tail -f /var/log/syslog
+
+
+    You can use a modified exec command to archive these syslogs if you wish.
+    For exam- ple, you could run the following command to get all logs for hour 11 on May 25th
+    archived to a compressed file:
+
+    $ docker exec syslogger bash -c "cat /var/log/syslog | \
+    grep '^May 25 11'" | xz - > /var/log/archive/May25_11.log.xz
+
+### - Technique 11 - Monitoring containers with cAdvisor
+    PROBLEM
+    You want to monitor the performance of your containers.
+    SOLUTION
+    Use cAdvisor as a monitoring tool.
+    cAdvisor is a tool developed by Google for monitoring containers. It’s open- sourced on GitHub at https://github.com/google/cadvisor.
+    cAdvisor runs as a daemon that collects performance data on running containers. Among other things, it tracks
+    + Resource isolation parameters
+    + Historical resource usage
+    + Network statistics
+
+    #run cAdvisor
+
+![](./monitoring_logging/monitoring_usage_containers/cAdvisor.png)
+
+    $   docker run \
+        --volume /:/rootfs:ro \
+        --volume /var/run:/var/run:rw \
+        --volume /sys:/sys:ro \
+        --volume /var/lib/docker/:/var/lib/docker:ro \
+        -p 8080:8080 -d --name cadvisor \
+        --restart on-failure:10 google/cadvisor
+
+    Once you’ve started the image, you can visit http://localhost:8080 with your browser
+    to start examining the data output. There’s information about the host, but by click- ing
+    on the Docker Containers link at the top of the homepage, you’ll be able to exam- ine graphs of CPU,
+    memory, and other historical data. Just click on the running containers listed under
+    the Subcontainers heading.
+
+### - Technique 12 - Restricting the cores a container can execute on
+
+    By default, Docker allows containers to execute on any cores on your machine.
+    Con- tainers with a single process and thread will obviously only be able to max out one core,
+    but multithreaded programs in a container (or multiple single-threaded pro- grams) will be able
+    to use all your CPU cores. You might want to change this behavior if you have a container that’s
+    more important than others—it’s not ideal for customer- facing applications to have to fight for
+    the CPU every time your internal daily reports run. You could also use this technique to prevent
+    runaway containers from locking you out of SSH to a server.
+
+    PROBLEM
+    You want a container to have a minimum CPU allocation, have a hard limit on CPU consumption,
+    or otherwise want to restrict the cores a container can run on.
+
+    SOLUTION
+    Use the --cpuset-cpus option to reserve CPU cores for your container.
+    To properly explore the --cpuset-cpus option, you’ll need to follow this
+    tech- nique on a computer with multiple cores. This may not be the case
+    if you’re using a cloud machine.
+
+    TIP
+    Older versions of Docker used the flag --cpuset, which is now depre-
+    cated. If you can’t get --cpuset-cpus to work, try using --cpuset instead.
+
+    If you now run htop, you’ll probably see that none of your cores are busy. To simu- late some load inside a couple of containers, run the following command in two dif- ferent terminals:
+    $ docker run ubuntu:14.04 sh -c 'cat /dev/zero >/dev/null'
+    Looking back at htop, you should see that two of your cores now show 100% use. To restrict this to one core, docker kill the previous containers and then run the follow- ing command in two terminals:
+    $ docker run --cpuset-cpus=0 ubuntu:14.04 sh -c 'cat /dev/zero >/dev/null'
+    Now htop will show that only your first core is being used by these containers.
+
+### - Technique 13 -  Giving important containers more CPU :
+    Containers on a host will normally share CPU usage equally when they compete for it.
+    cycles, robbing a web server on the machine of the ability to serve end users. PROBLEM
+
+    SOLUTION
+    Use the -c/--cpu-shares argument to the docker run command to define the rela- tive share of CPU usage.
+    When a container is started up, it’s given a number (1024 by default) of CPU shares. When only one process is running,
+    it will have access to 100% of the CPU if necessary, no matter how many CPU shares it has access to.
+    It’s only when competing with other containers for CPU that the number is used.
+
+    Imagine we have three containers (A, B, and C) all trying to use all available CPU resources:
+    + If they’ve all been given equal CPU shares, they will each be allocated one third of the CPU.
+    + If A and B are given 512 and C is given 1024, C will get half of the CPU, and A and B will get a quarter each.
+    + If A is given 10, B is given 100, and C is given 1000, A will get under 1% of the available CPU resources and will only be able to do anything resource-hungry if B and C are idle.
+
+    - All of this assumes that your containers can use all cores on your machine (or that you only have one core).
+      Docker will spread the load from containers across all cores where possible. If you have two containers
+      running single-threaded applications on a two-core machine, there’s obviously no way to apply relative weighting
+      while maxi- mally using the available resources. Each container will be given a core to execute on, regardless of its weight.
+
+    # run a container without cpu
+
+    $ docker run --cpuset-cpus=0 -c 10000 ubuntu:14.04 \
+    sh -c 'cat /dev/zero > /dev/null' &
+
+    $ docker run --cpuset-cpus=0 -c 1 -it ubuntu:14.04 bash
+
+    # error minimum cpu-shares for a container is 2
+
+### - Technique 14 - Limiting the memory usage of a container
+
+    When you run a container, Docker will allow it to allocate as much memory from the host as possible.
+    Usually this is desirable (and a big advantage over virtual machines, which have an inflexible
+    way of allocating memory). But sometimes applications can go out of control, allocate too much
+    memory, and bring a machine grinding to a halt as it starts swapping. It’s annoying,
+    and it’s happened to us many times in the past. We want a way of limiting a container’s
+    memory consumption to prevent this.
+
+    PROBLEM
+    You want to be able to limit the memory consumption of a container.
+    SOLUTION
+    Use the -m/--memory parameter to docker run.
+
+    If you’re running Ubuntu, chances are that you don’t have the memory-limiting
+    capability enabled by default. To check, run docker info. If one of the lines in the output is a warning
+    about No swap limit support, there’s unfortunately some setup work you need to do.
+    Be aware that making these changes can have performance implications on your machine for all applications—see
+    the Ubuntu installation docu- mentation for more information (http://docs.docker.com/engine/installation/ubuntulinux/#adjust-memory-and-swap-accounting).
+    In short, you need to indicate to the kernel at boot that you want these limits to be available.
+    To do this, you’ll need to alter /etc/default/grub as follows. If GRUB_CMDLINE _LINUX already has values in it,
+    add the new ones at the end:
+
+    -GRUB_CMDLINE_LINUX=""
+    +GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
+
+    - You now need to run sudo update-grub and restart your computer. Running docker info should no longer give you the warning, and you’re now ready to proceed with the main attraction.
+
+![](./static/memory_limiting.png)
+
+    There’s a gotcha with this kind of constraint. To demonstrate this, we’ll use the jess/ stress image,
+    which contains stress, a tool designed for testing the limits of a system.
+    TIP
+    Jess/stress is a helpful image for testing any resource limits you impose on your container.
+    Try out the previous techniques with this image if you want to experiment more.
+    If you run the following command, you might be surprised to see that it doesn’t exit immediately:
+
+    $ docker run -m 100m jess/stress --vm 1 --vm-bytes 150M --vm-hang 0
+
+    You’ve asked Docker to limit the container to 100 MB, and you’ve instructed stress to take up 150 MB.
+    You can verify that stress is operating as expected by running this command:
+
+    $ docker top <container_id> -eo pid,vsz,args
+
+    The size column is in KB and shows that your container is indeed taking about 150 MB of memory,
+    raising the question of why it hasn’t been killed. It turns out that Docker double-reserves memory—half
+    for physical memory and half to swap. If you try the following command, the container will terminate immediately:
+
+    $ docker run -m 100m jess/stress --vm 1 --vm-bytes 250M --vm-hang 0
+
+    ### - Technique 15 - Using Docker to run cron jobs
+
+    PROBLEM
+    You want your cron jobs to be centrally managed and auto-updated.
+
+    SOLUTION
+    Pull and run your cron job scripts as Docker containers.
+
+    At this point you may be wondering why it’s worth bothering with this, if you already have a solution that works.
+    Here are some advantages of using Docker as the delivery mechanism:
+    - Whenever a job is run, the job will update itself to the latest version from the central location.
+    - Your crontab files become much simpler, because the script and the code are encapsulated in a Docker image.
+    - For larger or more complex changes, only the deltas of the Docker image need be pulled, speeding up delivery and updates.
+    - You don’t have to maintain the code or binaries on the machine itself.
+    - You can combine Docker with other techniques, such as logging output to the sys- log, to simplify and centralize
+      the management of these administration services.
+
+![](./static/crontab_docker_registry.png)
+![](./static/cronjob.png)
+
+    # Log cleaner crontab entry with alerting on error
+
+    00*** \
+    (IMG=dockerinpractice/log_cleaner && \
+    docker pull $IMG && \
+    docker run -v /var/log/myapplogs:/log_dir $IMG 1) \ || my_alert_command 'log_cleaner failed'
+
+    0 0 * * * IMG=dockerinpractice/log_cleaner && docker pull $IMG && docker run -v /var/log/myapplogs:/log_dir $IMG 1
+    0 0 * * * (IMG=dockerinpractice/log_cleaner && docker pull $IMG && docker run -v /var/log/myapplogs:/log_dir $IMG 1) || my_alert_command 'log_cleaner failed'
