@@ -202,7 +202,7 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
     tion and experiment by changing files to see what happens.
 
     1- docker run -d -p 8000:8000 --name todobug1 dockerinpractice/todoapp (in the background run the image)
-    2docker exec -i -t todobug1 /bin/bash - (get into the application folder inside docker container)
+    2 docker exec -i -t todobug1 /bin/bash - (get into the application folder inside docker container)
 
     3- install some tools
         apt-get update
@@ -579,3 +579,94 @@ All-in-One Docker Commands High-Performance Architecture For Production needs.
 
     0 0 * * * IMG=dockerinpractice/log_cleaner && docker pull $IMG && docker run -v /var/log/myapplogs:/log_dir $IMG 1
     0 0 * * * (IMG=dockerinpractice/log_cleaner && docker pull $IMG && docker run -v /var/log/myapplogs:/log_dir $IMG 1) || my_alert_command 'log_cleaner failed'
+
+
+### - Technique 15 - backups
+
+    If you’ve ever run a transactional system, you’ll know that when things go wrong,
+    the ability to infer the state of the system at the time of the problem is essential
+    for a root- cause analysis.
+
+    Usually this is done through a combination of means:
+    - Analysis of application logs
+    - Database forensics (determining the state of data at a given point in time)
+    - Build history analysis (working out what code and config was running on the
+        service at a given point in time)
+    - Live system analysis (for example, did anyone log onto the box and change
+        something?)
+
+    PROBLEM
+    You want to keep backups of Docker containers.
+    SOLUTION
+    Commit the containers while running, and push the resulting image as a dedicated Docker repository.
+
+![](./static/backup.png)
+
+    # Setup a local registry on port 0.0.0.0:5000
+
+    $ docker run -d -p 5000:5000 -v $HOME/registry:/var/lib/registry registry:2
+    docker pull tutum/wordpress
+    $ DATE=$(date +%Y%m%d_%H%M%S)
+    $ TAG="0.0.0.0:5000/wordpress_backup:$(hostname -s)_${DATE}"
+    $ docker ps -> names -> competent_gauss
+    $ docker commit -m="$DATE" -a="Backup Admin" competent_gauss $TAG
+
+    check weather your image is in the registry or nah
+    $ docker images
+
+    curl -X GET http://0.0.0.0:5000/v2/_catalog
+
+    WARNING
+    This technique will pause the container while it runs, effectively taking it out of service.
+    Your service should either tolerate outages, or you should have other nodes running at
+    the time that can service requests in a load-balanced fashion.
+
+    ++ The backups only push the differences between the base image and the state of the container
+       at the time it’s backed up, and the backups are staggered to ensure that the service stays
+       up on at least one host. The registry server only stores one copy of the base image and
+       the diffs at each commit point, saving disk space.
+
+### - Technique 16 - Disabling the OOM killer :
+
+    - The “OOM killer” sounds like a bad horror film or severe disease, but it is in fact a thread within the Linux operating
+      system kernel that decides what to do when the host is running out of memory. After the operating system has run out of hardware memory,
+      used up any available swap space, and removed any cached files out of mem- ory, it invokes the OOM killer to decide which processes
+      should be killed off.
+
+    PROBLEM
+    You want to prevent containers from being killed by the OOM killer.
+    SOLUTION
+    Use the --oom-kill-disable flag when starting your container.
+    Solving this challenge is as simple as adding a flag to your Docker container.
+    But as is often the case, the full story isn’t that simple.
+    The following listing shows how you disable the OOM killer for a container:
+
+    $ docker run -ti --oom-kill-disable ubuntu sleep 1
+
+    WARNING: Disabling the OOM killer on containers without setting a '-m/--memory' limit may be dangerous.
+    WARNING: OOM killer is disabled for the container, but no memory limit is set, this can result in the system running out of resources.
+
+    % best practice :
+    $ docker run -ti --oom-kill-disable --memory 4M ubuntu sleep 1
+
+
+    NOTE
+    The minimum amount of memory you can allocate is 4M, where the “M” stands for megabytes.
+    You can also allocate by “G” for gigabytes.
+
+    # check if your container is OOM-KILLER - take any container id
+
+    $ docker inspect 3ef3e1668397 | grep OOMKilled
+
+
+###  debugging :
+
+    # if you want to check th error behind a command failure
+
+    $ docker pull image/logger
+    error
+    $ echo $?
+    134
+
+    - an exit code of 0 means the call was successful, and a nonzero code indicates an error
+      or exceptional condition of some kind.
